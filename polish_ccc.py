@@ -29,7 +29,7 @@ REQUIRED_SHEETS = [
     "Salarysheet",
     "Operations Control",
 ]
-OUTPUT_SHEETS = REQUIRED_SHEETS + ["Action Center"]
+OUTPUT_SHEETS = REQUIRED_SHEETS + ["Action Center", "Kanban Board"]
 SHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 DOC_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 PKG_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -82,11 +82,6 @@ def cache_overrides(values, action_inputs=None):
     metrics = [expired, due_soon, finding_count, live_rows, held, missing_dates]
     is_open = [expired > 0, due_soon > 0, finding_count > 0, live_rows == 0, held > 0, missing_dates > 0]
     open_count = sum(is_open)
-    summary = (
-        f"{'Live timesheet rows: ' + format(live_rows, ',') if live_rows else 'No live timesheet inputs'}"
-        f"  ·  Payroll ready/held SAR {ready:,.2f}/{held:,.2f}"
-        f"  ·  {finding_count:,} open findings  ·  Open actions: {open_count}"
-    )
     review_date = values["Operations Control"]["B1770"].value
     if not isinstance(review_date, (datetime.datetime, datetime.date)):
         review_date = dash["N12"].value
@@ -94,16 +89,27 @@ def cache_overrides(values, action_inputs=None):
 
     unassigned = 0
     overdue = 0
+    statuses_by_row = {}
     for idx, row in enumerate(range(6, 12)):
-        if not is_open[idx]:
-            continue
         owner = action_inputs.get((row, 5))
         due_date = action_inputs.get((row, 6))
-        action_status = action_inputs.get((row, 7), "")
-        unassigned += not bool(owner)
-        if isinstance(due_date, datetime.datetime):
-            due_date = due_date.date()
-        overdue += bool(due_date and review_day and due_date < review_day and action_status != "Done")
+        action_status = action_inputs.get((row, 7), "") or ""
+        statuses_by_row[row] = action_status
+        if is_open[idx]:
+            unassigned += not bool(owner)
+            if isinstance(due_date, datetime.datetime):
+                due_date = due_date.date()
+            overdue += bool(due_date and review_day and due_date < review_day and action_status != "Done")
+
+    ready_line = (
+        f"Payroll ready SAR {ready:,.2f}  ·  Held SAR {held:,.2f}  ·  "
+        f"Unassigned actions {unassigned}  ·  Overdue follow-ups {overdue}"
+    )
+    summary = (
+        f"{'Live timesheet rows: ' + format(live_rows, ',') if live_rows else 'No live timesheet inputs'}"
+        f"  ·  Payroll ready/held SAR {ready:,.2f}/{held:,.2f}"
+        f"  ·  {finding_count:,} open findings  ·  Open actions: {open_count}"
+    )
 
     action = {
         "B3": ("n", str(open_count)),
@@ -129,14 +135,54 @@ def cache_overrides(values, action_inputs=None):
         action[f"D{row}"] = ("str", statuses[idx])
         action[f"I{row}"] = ("str", link_texts[idx])
 
-    return {
-        "Dashboard": {
-            "B17": ("str", summary),
-            "N15": ("n", str(finding_count)),
-            "N16": ("str", "Open action center →"),
-        },
-        "Action Center": action,
+    board = {
+        "A2": ("str", "Manage owners, due dates, status and remarks in Action Center."),
+        "D4": ("n", "0"), "I4": ("n", "0"), "N4": ("n", "0"),
     }
+    open_lane = in_progress_lane = done_lane = 0
+    for idx, action_row in enumerate(range(6, 12)):
+        action_status = statuses_by_row[action_row]
+        if is_open[idx] and action_status not in ("In progress", "Done"):
+            lane = "OPEN"
+            open_lane += 1
+        elif is_open[idx] and action_status == "In progress":
+            lane = "IN PROGRESS"
+            in_progress_lane += 1
+        elif action_status == "Done" or (not is_open[idx] and bool(action_status)):
+            lane = "DONE"
+            done_lane += 1
+        else:
+            lane = ""
+
+        owner = action_inputs.get((action_row, 5)) or "Unassigned"
+        due = action_inputs.get((action_row, 6))
+        if isinstance(due, datetime.datetime):
+            due = due.date()
+        due_text = due.strftime("%d %b") if isinstance(due, datetime.date) else "—"
+        remark = action_inputs.get((action_row, 8))
+        metric_text = f"{metrics[idx]:,.2f} SAR" if idx == 4 else f"{metrics[idx]:,.0f}"
+        lead = "RESOLVED" if lane == "DONE" and not is_open[idx] else lane
+        card = ""
+        if lane:
+            card = f"{lead} · {priorities[idx]}\n{actions[idx] if is_open[idx] else clear_actions[idx]}\nMetric: {metric_text}\nOwner: {owner} · Due: {due_text}"
+            if remark:
+                card += f"\nNote: {remark}"
+            if lane == "DONE" and is_open[idx]:
+                card += "\nAlert remains open in source data"
+        card_row = 6 + idx * 4
+        for col, target_lane in (("A", "OPEN"), ("F", "IN PROGRESS"), ("K", "DONE")):
+            board[f"{col}{card_row}"] = ("str", card if lane == target_lane else "")
+
+    board["D4"] = ("n", str(open_lane))
+    board["I4"] = ("n", str(in_progress_lane))
+    board["N4"] = ("n", str(done_lane))
+    dashboard_kpis = {
+        "B17": ("str", summary),
+        "B22": ("str", ready_line),
+        "N15": ("n", str(finding_count)),
+        "N16": ("str", "Open Kanban board →"),
+    }
+    return {"Dashboard": dashboard_kpis, "Action Center": action, "Kanban Board": board}
 
 
 def sheet_parts(archive: zipfile.ZipFile) -> dict[str, str]:
@@ -421,6 +467,116 @@ def add_action_center(book, action_inputs=None):
     return ws
 
 
+def add_kanban_board(book):
+    ws = book.create_sheet("Kanban Board")
+    ws.sheet_view.showGridLines = False
+    ws.sheet_view.zoomScale = 85
+    ws.sheet_properties.tabColor = "4D7C8A"
+    for col in "ADGKN":
+        ws.column_dimensions[col].width = 15
+    for col in "BCHLM":
+        ws.column_dimensions[col].width = 14
+    for col in "FI":
+        ws.column_dimensions[col].width = 14
+    for col in ("E", "J"):
+        ws.column_dimensions[col].width = 2.5
+
+    dark = "163239"
+    white = "FFFFFF"
+    open_fill = "FBE7E1"
+    progress_fill = "FFF3C4"
+    done_fill = "E2F3EB"
+    line = Side(style="thin", color="D8E1E0")
+    border = Border(left=line, right=line, top=line, bottom=line)
+
+    ws.merge_cells("A1:N1")
+    ws["A1"] = "CCC  /  KANBAN BOARD"
+    ws["A1"].fill = PatternFill("solid", fgColor=dark)
+    ws["A1"].font = Font(name="Calibri", size=19, bold=True, color=white)
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[1].height = 35
+    ws.merge_cells("A2:N2")
+    ws["A2"] = '=HYPERLINK("#\'Action Center\'!A1","Manage owners, due dates, status and remarks in Action Center.")'
+    ws["A2"].fill = PatternFill("solid", fgColor="F3F7F5")
+    ws["A2"].font = Font(name="Calibri", size=10, color="24505A", underline="single")
+    ws["A2"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[2].height = 24
+
+    for label_ref, count_cell, title, fill in [
+        ("A4:C4", "D4", "OPEN", open_fill),
+        ("F4:H4", "I4", "IN PROGRESS", progress_fill),
+        ("K4:M4", "N4", "DONE / RESOLVED", done_fill),
+    ]:
+        ws.merge_cells(label_ref)
+        label = ws[label_ref.split(":")[0]]
+        label.value = title
+        label.fill = PatternFill("solid", fgColor=fill)
+        label.font = Font(name="Calibri", size=12, bold=True, color=dark)
+        label.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        count = ws[count_cell]
+        count.fill = PatternFill("solid", fgColor=fill)
+        count.font = Font(name="Calibri", size=14, bold=True, color=dark)
+        count.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[4].height = 26
+    ws["D4"] = '=COUNTIFS(\'Action Center\'!$D$6:$D$11,"OPEN",\'Action Center\'!$G$6:$G$11,"<>In progress",\'Action Center\'!$G$6:$G$11,"<>Done")'
+    ws["I4"] = '=COUNTIFS(\'Action Center\'!$D$6:$D$11,"OPEN",\'Action Center\'!$G$6:$G$11,"In progress")'
+    ws["N4"] = '=COUNTIF(\'Action Center\'!$G$6:$G$11,"Done")+COUNTIFS(\'Action Center\'!$D$6:$D$11,"CLEAR",\'Action Center\'!$G$6:$G$11,"<>",\'Action Center\'!$G$6:$G$11,"<>Done")'
+
+    lanes = [
+        ("OPEN", "A", "D", open_fill),
+        ("IN PROGRESS", "F", "I", progress_fill),
+        ("DONE", "K", "N", done_fill),
+    ]
+    action_sheet = "'Action Center'"
+    for idx, action_row in enumerate(range(6, 12)):
+        start_row = 6 + idx * 4
+        for lane, first_col, last_col, fill in lanes:
+            ref = f"{first_col}{start_row}:{last_col}{start_row + 2}"
+            ws.merge_cells(ref)
+            if lane == "OPEN":
+                condition = f'AND({action_sheet}!$D${action_row}="OPEN",{action_sheet}!$G${action_row}<>"In progress",{action_sheet}!$G${action_row}<>"Done")'
+                lane_lead = '"OPEN · "&'
+            elif lane == "IN PROGRESS":
+                condition = f'AND({action_sheet}!$D${action_row}="OPEN",{action_sheet}!$G${action_row}="In progress")'
+                lane_lead = '"IN PROGRESS · "&'
+            else:
+                condition = f'OR({action_sheet}!$G${action_row}="Done",AND({action_sheet}!$D${action_row}="CLEAR",{action_sheet}!$G${action_row}<>""))'
+                lane_lead = f'IF({action_sheet}!$D${action_row}="CLEAR","RESOLVED","DONE")&" · "&'
+            metric = f'TEXT({action_sheet}!$C${action_row},"#,##0.##")'
+            if action_row == 10:
+                metric = f'TEXT({action_sheet}!$C${action_row},"#,##0.00")&" SAR"'
+            body = (
+                f'{lane_lead}{action_sheet}!$A${action_row}&CHAR(10)&{action_sheet}!$B${action_row}'
+                f'&CHAR(10)&"Metric: "&{metric}'
+                f'&CHAR(10)&"Owner: "&IF({action_sheet}!$E${action_row}="","Unassigned",{action_sheet}!$E${action_row})'
+                f'&" · Due: "&IF({action_sheet}!$F${action_row}="","—",TEXT({action_sheet}!$F${action_row},"dd mmm"))'
+                f'&IF({action_sheet}!$H${action_row}<>"",CHAR(10)&"Note: "&{action_sheet}!$H${action_row},"")'
+                f'&IF(AND({action_sheet}!$D${action_row}="OPEN",{action_sheet}!$G${action_row}="Done"),CHAR(10)&"Alert remains open in source data","")'
+            )
+            formula = f'=IF({condition},HYPERLINK("#\'Action Center\'!A{action_row}",{body}),"")'
+            cell = ws[f"{first_col}{start_row}"]
+            cell.value = formula
+            cell.font = Font(name="Calibri", size=10, color=dark)
+            cell.fill = PatternFill("solid", fgColor=fill)
+            cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True, indent=1)
+            cell.border = border
+            for r in range(start_row, start_row + 3):
+                for c in range(openpyxl.utils.column_index_from_string(first_col), openpyxl.utils.column_index_from_string(last_col) + 1):
+                    ws.cell(r, c).fill = PatternFill("solid", fgColor=fill)
+                    ws.cell(r, c).border = border
+            for r in range(start_row, start_row + 3):
+                ws.row_dimensions[r].height = 22
+        ws.row_dimensions[start_row + 3].height = 7
+
+    ws.freeze_panes = "A5"
+    ws.print_area = "A1:N28"
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 1
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    return ws
+
+
 def polish(source: Path, output: Path) -> dict[str, int]:
     if not source.is_file():
         raise FileNotFoundError(f"Workbook not found: {source}")
@@ -452,7 +608,7 @@ def polish(source: Path, output: Path) -> dict[str, int]:
     dashboard["B3"] = "Workforce & payroll  /  SYNTHETIC DATA"
     dashboard["N14"] = "Open findings"
     dashboard["N15"] = "=B29"
-    dashboard["N16"] = '=HYPERLINK("#\'Action Center\'!A1","Open action center →")'
+    dashboard["N16"] = '=HYPERLINK("#\'Kanban Board\'!A1","Open Kanban board →")'
     dashboard["B17"] = (
         '=IF(COUNTIF(Timesheet_Input!$BE$6:$BE$425,1)=0,"No live timesheet inputs",'
         '"Live timesheet rows: "&COUNTIF(Timesheet_Input!$BE$6:$BE$425,1))'
@@ -461,7 +617,25 @@ def polish(source: Path, output: Path) -> dict[str, int]:
         '&TEXT(Salarysheet!$F$947,"#,##0.00")'
         '&"  ·  "&N15&" open findings  ·  Open actions: "&\'Action Center\'!$B$3'
     )
+    dashboard["B22"] = (
+        '=\"Payroll ready SAR \"&TEXT(Salarysheet!$B$947,\"#,##0.00\")'
+        '&\"  ·  Held SAR \"&TEXT(Salarysheet!$F$947,\"#,##0.00\")'
+        '&\"  ·  Unassigned actions \"&\'Action Center\'!$D$3'
+        '&\"  ·  Overdue follow-ups \"&\'Action Center\'!$F$3'
+    )
+    if any(r.min_row <= 22 <= r.max_row for r in dashboard.merged_cells.ranges):
+        raise ValueError("Unexpected merged cells in Dashboard row 22.")
+    if any(dashboard.cell(22, col).value is not None for col in range(3, 17)):
+        raise ValueError("Dashboard row 22 is not empty; refusing to overwrite it.")
+    dashboard.merge_cells("B22:P22")
+    dashboard["B22"]._style = copy(dashboard["B17"]._style)
+    dashboard["B22"].font = Font(name="Calibri", size=10, bold=True, color="30474B")
+    dashboard["B22"].fill = PatternFill("solid", fgColor="E7F0F2")
+    dashboard["B22"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    dashboard.row_dimensions[22].height = 21
+
     action_ws = add_action_center(original, action_inputs)
+    kanban_ws = add_kanban_board(original)
     tables_before = table_refs(original)
     validations_before = validation_signature(original)
 
@@ -510,11 +684,15 @@ def polish(source: Path, output: Path) -> dict[str, int]:
     original.calculation.forceFullCalc = False
     original.calculation.calcOnSave = True
 
-    for coordinate in ("B17", "N15", "N16"):
+    for coordinate in ("B17", "N15", "N16", "B22"):
         value = dashboard[coordinate].value
         if not isinstance(value, str) or not value.startswith("="):
             raise AssertionError(f"Expected a formula in Dashboard!{coordinate}")
         Tokenizer(value)
+    for worksheet in (action_ws, kanban_ws):
+        for cell in worksheet._cells.values():
+            if cell.data_type == "f":
+                Tokenizer(cell.value)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="ccc-polish-") as temp_dir:
@@ -535,9 +713,11 @@ def polish(source: Path, output: Path) -> dict[str, int]:
     expected_formulas["Dashboard", "B17"] = dashboard["B17"].value
     expected_formulas["Dashboard", "N15"] = "=B29"
     expected_formulas["Dashboard", "N16"] = dashboard["N16"].value
+    expected_formulas["Dashboard", "B22"] = dashboard["B22"].value
     expected_formulas.update({
-        ("Action Center", cell.coordinate): cell.value
-        for cell in action_ws._cells.values()
+        (sheet_name, cell.coordinate): cell.value
+        for sheet_name, worksheet in (("Action Center", action_ws), ("Kanban Board", kanban_ws))
+        for cell in worksheet._cells.values()
         if cell.data_type == "f"
     })
     assert formula_cells(polished) == expected_formulas
@@ -564,7 +744,7 @@ def polish(source: Path, output: Path) -> dict[str, int]:
             if result_type == "n":
                 assert float(actual) == float(expected), (sheet_name, coordinate, actual, expected)
             else:
-                assert actual == expected, (sheet_name, coordinate, actual, expected)
+                assert actual == expected or (actual is None and expected == ""), (sheet_name, coordinate, actual, expected)
 
     formula_errors = [
         (ws.title, cell.coordinate)

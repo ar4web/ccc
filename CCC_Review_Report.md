@@ -1,27 +1,28 @@
 # CCC V1 review
 
-**Status:** The refreshed CCC workbook now adds a dynamic Action Center to the original five-tab model. The user confirmed that the sample records are synthetic; all outputs are labelled accordingly. The source workbook is unchanged.
+**Status:** The refreshed CCC workbook adds a dynamic Action Center and Kanban Board to the original five-tab model. The user confirmed the sample records are synthetic; all outputs are labelled accordingly. The source workbook is unchanged.
 
 ## What changed
 
-- The Dashboard is branded **CCC — Company Command Center** and remains focused on active staff, expired Iqamas, items due within 15 days, and open findings.
-- A live status line shows filtered timesheet rows, ready/held payroll estimates, findings, and open actions. The Dashboard links directly to the Action Center.
-- The new **Action Center** adds six formula-driven alerts: expired Iqamas, renewals due soon, open findings, no current-period timesheet input, held payroll, and missing Iqama dates. Each has a source link plus editable owner, follow-up date, action status, and remarks. Summary counts show open, unassigned, and overdue follow-ups. Source issues clear their alerts when the underlying metric is resolved.
-- Red/amber/green labels and formatting distinguish urgent items, due-soon items, input needed, and clear items. Detailed sections remain available in the other tabs; the renewal worklist stays visible on the Dashboard.
-- Three files are included: automatic full workbook, manual F9 full workbook, and a fast static Quick View.
+- The Dashboard has four lead cards: active staff, expired Iqamas, items due within 15 days, and open findings. A second KPI band shows submitted timesheets, flagged entries, total workforce, and timesheet coverage. A compact third strip shows payroll ready/held amounts plus unassigned and overdue follow-ups.
+- The live status line shows filtered timesheet rows, payroll estimates, open findings, and open actions. A Dashboard link opens the Kanban board.
+- **Action Center** has six formula-driven alerts: expired Iqamas, renewals due soon, open findings, no current-period timesheet input, held payroll, and missing Iqama dates. Each links to its source tab and has editable owner, follow-up date, action status, and remarks. Summary formulas count open, unassigned, and overdue items.
+- **Kanban Board** sorts alert cards into Open, In Progress, and Done/Resolved. Changing Action status in the Action Center moves the card; resolving the source metric clears the alert. A test with a temporary owner, due date, status, and remark confirmed that the card and Dashboard counts update as intended.
+- Alert labels and colors distinguish urgent, due soon, input needed, in-progress, and clear states. Detailed tables remain available; the renewal worklist stays visible on the Dashboard.
+- Three outputs are included: full automatic, full manual-calculation, and static Quick View.
 
 ## Why the workbook felt slow
 
-The full workbook has **117,831 formulas** (117,796 in V1, plus 35 for the Action Center and Dashboard link). **103,946 original formulas have no saved result cache**, and V1 was set to force a full recalculation on every open. The file size is not the main cause; Excel formula calculation is. There are also 841 `TODAY()` calls on Operations Control; centralizing their date logic may help further, but should be tested against the intended business rule.
+The full workbook now has **117,854 formulas**: 117,796 in V1, plus 34 Action Center formulas, 22 Kanban formulas, and two new Dashboard formulas. **103,946 original formulas have no saved result cache**, and V1 was set to force a full recalculation on every open. The file size is not the main cause; Excel formula calculation is. Operations Control also has 841 `TODAY()` formulas; centralizing their date logic may reduce volatility, but should be tested against the intended business rule.
 
 The automatic workbook no longer forces a full recalculation on every open. Excel may still calculate missing results the first time; save after it finishes. The manual workbook avoids automatic recalculation until **F9**. The static Quick View opens quickly but cannot refresh.
 
 ## Verification
 
-- The automatic and manual full workbooks have six tabs, 11 Excel tables, 10 data validations, and three Salarysheet charts. The two Dashboard charts are removed.
-- The automatic copy retains all original formulas and caches except the updated Dashboard status/KPI formulas; the Action Center adds formula-driven alert cells with sample caches. No existing source input values were changed.
-- Structural checks found zero cached formula errors. The original data contain no live current-period timesheet rows or numeric payroll results. The displayed 147 active staff, 75 expired Iqamas, 8 due within 15 days, 17 findings, and SAR 0 ready/held are sample/cached values—not a validated payroll run.
-- No Excel calculation engine is available here, so actual recalculation speed and transaction results were not benchmarked. Validate the formulas in Excel before operational use.
+- The full automatic and manual workbooks have seven tabs, 11 Excel tables, 10 data validations, and three Salarysheet charts. The two Dashboard charts were removed.
+- The automatic copy preserves source input values and original formula caches except for the updated Dashboard summaries. New Action Center/Kanban formulas have sample caches derived from V1's saved values.
+- Structural checks found zero cached formula errors. The source contains no live current-period timesheet rows or numeric payroll results. The displayed 147 active staff, 75 expired Iqamas, 8 due within 15 days, 17 findings, and SAR 0 ready/held are sample/cached values—not a validated payroll run.
+- No Excel calculation engine is available here, so full formula recalculation and actual Excel speed were not benchmarked. Validate totals in Excel before operational use.
 
 ## Further improvements before operational use
 
