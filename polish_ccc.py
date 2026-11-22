@@ -101,9 +101,17 @@ def cache_overrides(values, action_inputs=None):
                 due_date = due_date.date()
             overdue += bool(due_date and review_day and due_date < review_day and action_status != "Done")
 
-    ready_line = (
-        f"Payroll ready SAR {ready:,.2f}  ·  Held SAR {held:,.2f}  ·  "
-        f"Unassigned actions {unassigned}  ·  Overdue follow-ups {overdue}"
+    in_progress_count = sum(
+        is_open[idx] and statuses_by_row[row] == "In progress"
+        for idx, row in enumerate(range(6, 12))
+    )
+    done_count = sum(
+        statuses_by_row[row] == "Done" or (not is_open[idx] and bool(statuses_by_row[row]))
+        for idx, row in enumerate(range(6, 12))
+    )
+    kpi_line = (
+        f"Unassigned actions {unassigned}  ·  Overdue follow-ups {overdue}  ·  "
+        f"In progress {in_progress_count}  ·  Done / resolved {done_count}"
     )
     summary = (
         f"{'Live timesheet rows: ' + format(live_rows, ',') if live_rows else 'No live timesheet inputs'}"
@@ -178,7 +186,7 @@ def cache_overrides(values, action_inputs=None):
     board["N4"] = ("n", str(done_lane))
     dashboard_kpis = {
         "B17": ("str", summary),
-        "B22": ("str", ready_line),
+        "B22": ("str", kpi_line),
         "N15": ("n", str(finding_count)),
         "N16": ("str", "Open Kanban board →"),
     }
@@ -618,10 +626,10 @@ def polish(source: Path, output: Path) -> dict[str, int]:
         '&"  ·  "&N15&" open findings  ·  Open actions: "&\'Action Center\'!$B$3'
     )
     dashboard["B22"] = (
-        '=\"Payroll ready SAR \"&TEXT(Salarysheet!$B$947,\"#,##0.00\")'
-        '&\"  ·  Held SAR \"&TEXT(Salarysheet!$F$947,\"#,##0.00\")'
-        '&\"  ·  Unassigned actions \"&\'Action Center\'!$D$3'
-        '&\"  ·  Overdue follow-ups \"&\'Action Center\'!$F$3'
+        '="Unassigned actions "&\'Action Center\'!$D$3'
+        '&"  ·  Overdue follow-ups "&\'Action Center\'!$F$3'
+        '&"  ·  In progress "&\'Kanban Board\'!$I$4'
+        '&"  ·  Done / resolved "&\'Kanban Board\'!$N$4'
     )
     if any(r.min_row <= 22 <= r.max_row for r in dashboard.merged_cells.ranges):
         raise ValueError("Unexpected merged cells in Dashboard row 22.")

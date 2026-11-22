@@ -6,11 +6,11 @@ The original V1 workbook has five data and operations tabs. The CCC refresh adds
 
 - [Full workbook — automatic calculation](CCC_Company_Command_Center.xlsx): all seven tabs, interactive Dashboard KPIs, live alerts, and Kanban. Changed formulas calculate automatically. A full recalculation is no longer forced every time the file opens. The first Excel open may still take time because many original formulas have no saved results; let it finish and save once.
 - [Full workbook — manual calculation](CCC_Manual_Recalc.xlsx): same seven tabs and formulas, but Excel does not recalculate automatically. Press **F9** to refresh. Formula cells without a saved result may appear blank until calculated.
-- [Quick View — static snapshot](CCC_Quick_View.xlsx): one color-coded sheet for quick viewing. It has no formulas and cannot refresh; it shows saved sample values only.
+- [Quick View — static snapshot](CCC_Quick_View.xlsx): one color-coded sheet for quick viewing, including the saved action-flow KPI strip. It has no formulas and cannot refresh; all values are saved sample values only.
 
 ## Dashboard and Kanban
 
-The Dashboard keeps the core cards for active staff, expired Iqamas, items due within 15 days, and open findings. A second KPI band shows submitted timesheets, flagged entries, total workforce, and timesheet coverage. A compact strip adds payroll ready/held amounts, unassigned actions, and overdue follow-ups.
+The Dashboard keeps the core cards for active staff, expired Iqamas, items due within 15 days, and open findings. A second KPI band shows submitted timesheets, flagged entries, total workforce, and timesheet coverage. A compact action strip adds unassigned actions, overdue follow-ups, in-progress actions, and done/resolved actions without repeating the payroll figures already shown above.
 
 The **Action Center** lists formula-driven alerts for expired Iqamas, renewals due within 15 days, open findings, missing current-period timesheets, held payroll, and missing Iqama dates. Each alert links to its source tab. Fill in the blue **Owner**, **Follow-up by**, **Action status**, and **Remarks** cells to manage work.
 

@@ -182,6 +182,18 @@ def quick_view(source: Path, output: Path) -> None:
     ws["A16"].alignment = Alignment(horizontal="left", vertical="center", indent=1, wrap_text=True)
     ws.row_dimensions[16].height = 30
 
+    action_kpis = str(dash["B22"].value or "Action KPIs not available in saved values.")
+    style_merged(
+        ws,
+        "A17:H17",
+        GREEN,
+        Font(name="Calibri", size=9, bold=True, color=DARK_TEXT),
+        left,
+    )
+    ws["A17"] = f"ACTION KPIs  ·  {action_kpis}"
+    ws["A17"].alignment = Alignment(horizontal="left", vertical="center", indent=1, wrap_text=True)
+    ws.row_dimensions[17].height = 27
+
     style_merged(ws, "A18:H18", DARK, header_font, left)
     ws["A18"] = "RENEWAL WORKLIST  /  SAVED SAMPLE ORDER"
     headers = [("A19", "Employee"), ("C19", "Client"), ("E19", "Expiry date"), ("F19", "Days left"), ("G19", "Next step")]

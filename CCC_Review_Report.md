@@ -4,12 +4,12 @@
 
 ## What changed
 
-- The Dashboard has four lead cards: active staff, expired Iqamas, items due within 15 days, and open findings. A second KPI band shows submitted timesheets, flagged entries, total workforce, and timesheet coverage. A compact third strip shows payroll ready/held amounts plus unassigned and overdue follow-ups.
+- The Dashboard has four lead cards: active staff, expired Iqamas, items due within 15 days, and open findings. A second KPI band shows submitted timesheets, flagged entries, total workforce, and timesheet coverage. A compact action strip shows unassigned, overdue, in-progress, and done/resolved action counts without repeating payroll values already in the status line.
 - The live status line shows filtered timesheet rows, payroll estimates, open findings, and open actions. A Dashboard link opens the Kanban board.
 - **Action Center** has six formula-driven alerts: expired Iqamas, renewals due soon, open findings, no current-period timesheet input, held payroll, and missing Iqama dates. Each links to its source tab and has editable owner, follow-up date, action status, and remarks. Summary formulas count open, unassigned, and overdue items.
 - **Kanban Board** sorts alert cards into Open, In Progress, and Done/Resolved. Changing Action status in the Action Center moves the card; resolving the source metric clears the alert. A test with a temporary owner, due date, status, and remark confirmed that the card and Dashboard counts update as intended.
 - Alert labels and colors distinguish urgent, due soon, input needed, in-progress, and clear states. Detailed tables remain available; the renewal worklist stays visible on the Dashboard.
-- Three outputs are included: full automatic, full manual-calculation, and static Quick View.
+- Three outputs are included: full automatic, full manual-calculation, and static Quick View. The static sheet also carries the saved action-flow KPI strip; it cannot refresh those values.
 
 ## Why the workbook felt slow
 
