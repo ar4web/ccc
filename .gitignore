@@ -1,0 +1,6 @@
+# Ignore locally generated copies; the committed demo workbook remains tracked.
+CCC_Company_Command_Center.xlsx
+*.xlsx.tmp
+__pycache__/
+*.py[cod]
+.venv/
