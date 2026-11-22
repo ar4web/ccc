@@ -15,7 +15,7 @@ import tempfile
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 
-from polish_ccc import formula_cells, transfer_formula_caches
+from polish_ccc import OUTPUT_SHEETS, formula_cells, transfer_formula_caches
 
 DARK = "163239"
 DARK_TEXT = "193940"
@@ -44,8 +44,8 @@ def date_text(value) -> str:
 
 def make_manual_copy(source: Path, output: Path) -> None:
     book = openpyxl.load_workbook(source, data_only=False)
-    if book.sheetnames != ["Dashboard", "Main Dataset", "Timesheet_Input", "Salarysheet", "Operations Control"]:
-        raise ValueError("Manual copy expects the complete five-tab CCC workbook.")
+    if book.sheetnames != OUTPUT_SHEETS:
+        raise ValueError("Manual copy expects the complete CCC workbook with its Action Center.")
     dash = book["Dashboard"]
     dash["B3"] = "Workforce & payroll  /  SYNTHETIC DATA  /  MANUAL CALC — PRESS F9"
     font = copy(dash["B3"].font)
