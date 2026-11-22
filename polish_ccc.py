@@ -255,8 +255,11 @@ def polish(source: Path, output: Path) -> dict[str, int]:
     original.properties.subject = "Workforce and payroll operations (synthetic data)"
     original.properties.description = "Focused workforce, payroll, compliance and review dashboard."
     original.calculation.calcMode = "auto"
-    original.calculation.fullCalcOnLoad = True
-    original.calculation.forceFullCalc = True
+    # Don't force a full 117k-formula recalculation on every open. Excel will
+    # still calculate changed formulas automatically, and may calculate once
+    # on first open because many source formulas have no saved result cache.
+    original.calculation.fullCalcOnLoad = False
+    original.calculation.forceFullCalc = False
     original.calculation.calcOnSave = True
 
     for coordinate in ("B17", "N15"):
@@ -286,7 +289,8 @@ def polish(source: Path, output: Path) -> dict[str, int]:
     assert formula_cells(polished) == expected_formulas
     assert not polished._external_links
     assert polished.calculation.calcMode == "auto"
-    assert polished.calculation.fullCalcOnLoad and polished.calculation.forceFullCalc
+    assert not polished.calculation.fullCalcOnLoad
+    assert not polished.calculation.forceFullCalc
 
     # Ensure all source formula results remain intact except the two visible
     # dashboard summaries whose cached strings/numbers are intentionally updated.
@@ -344,7 +348,8 @@ def main() -> None:
     result = polish(args.source.expanduser(), args.output.expanduser())
     print(f"Created {args.output}; formula caches preserved (not recalculated).")
     print("Audit:", result)
-    print("Open in Excel and confirm the period and totals; Excel is set to recalculate on open.")
+    print("Excel automatic calculation is enabled without forcing a full recalculation on every open.")
+    print("The first Excel open may still calculate formulas with missing saved results; save once after it finishes.")
 
 
 if __name__ == "__main__":

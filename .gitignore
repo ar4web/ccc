@@ -1,5 +1,7 @@
-# Ignore locally generated copies; the committed demo workbook remains tracked.
+# Ignore local generated copies; sample deliverables may be tracked deliberately.
 CCC_Company_Command_Center.xlsx
+CCC_Manual_Recalc.xlsx
+CCC_Quick_View.xlsx
 *.xlsx.tmp
 __pycache__/
 *.py[cod]
